@@ -19,13 +19,13 @@ IMAGE_LINK_RE = re.compile(r"!\[([^\]]*)]\(([^)]+)\)")
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Clone a markdown with local asset links for images.",
+        description="Clone markdown file(s) with local asset links for images.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
         "markdown",
         type=pathlib.Path,
-        help="Path to the source markdown file (kept untouched).",
+        help="Path to the source markdown file (kept untouched) or directory (batch).",
     )
     parser.add_argument(
         "--suffix",
@@ -96,24 +96,25 @@ def download(url: str, dest: pathlib.Path) -> None:
         dest.write_bytes(resp.read())
 
 
-def main() -> int:
-    args = parse_args()
-    md_path: pathlib.Path = args.markdown.expanduser().resolve()
-    if not md_path.exists():
-        print(f"[error] markdown file not found: {md_path}", file=sys.stderr)
-        return 1
+def is_clone_file(md_path: pathlib.Path, normalized_suffix: str) -> bool:
+    return md_path.name.endswith(f"{normalized_suffix}{md_path.suffix}")
 
-    selector = re.compile(args.pattern)
+
+def process_markdown(
+    md_path: pathlib.Path,
+    selector: re.Pattern[str],
+    suffix: str,
+    assets_dir_name: str,
+) -> int:
     text = md_path.read_text(encoding="utf-8")
 
-    # Extract all markdown image links and filter by selector regex.
     matches = [(m.group(1).strip(), m.group(2).strip()) for m in IMAGE_LINK_RE.finditer(text)]
     urls = unique_urls([url for _, url in matches if selector.search(url)])
     if not urls:
-        print("[info] no matching image URLs found; nothing to download")
+        print(f"[info] {md_path}: no matching image URLs found; nothing to download")
         return 0
 
-    asset_dir = (md_path.parent / args.assets_dir).resolve()
+    asset_dir = (md_path.parent / assets_dir_name).resolve()
     asset_dir.mkdir(parents=True, exist_ok=True)
     mapping: Dict[str, str] = {}
 
@@ -124,17 +125,50 @@ def main() -> int:
         filename = allocate_filename(base, asset_dir, mapping)
         download(url, asset_dir / filename)
         mapping[url] = filename
-        print(f"[downloaded] {url} -> {asset_dir / filename}")
+        print(f"[downloaded] {md_path}: {url} -> {asset_dir / filename}")
 
     new_text = text
-    rel_assets = pathlib.Path(args.assets_dir)
+    rel_assets = pathlib.Path(assets_dir_name)
     for url, fname in mapping.items():
         new_text = new_text.replace(url, str(rel_assets / fname))
 
-    out_path = build_output_path(md_path, args.suffix)
+    out_path = build_output_path(md_path, suffix)
     out_path.write_text(new_text, encoding="utf-8")
     print(f"[done] cloned markdown: {out_path}")
     print(f"[summary] downloaded {len(mapping)} file(s) to {asset_dir}")
+    return len(mapping)
+
+
+def main() -> int:
+    args = parse_args()
+    target: pathlib.Path = args.markdown.expanduser().resolve()
+    if not target.exists():
+        print(f"[error] path not found: {target}", file=sys.stderr)
+        return 1
+
+    selector = re.compile(args.pattern)
+    normalized_suffix = args.suffix if args.suffix.startswith(".") else f".{args.suffix}"
+
+    if target.is_dir():
+        md_files = sorted(target.rglob("*.md"))
+        if not md_files:
+            print(f"[info] no markdown files under {target}")
+            return 0
+
+        total_downloaded = 0
+        for md in md_files:
+            if is_clone_file(md, normalized_suffix):
+                print(f"[skip] {md} (looks like cloned output)")
+                continue
+            try:
+                total_downloaded += process_markdown(md, selector, args.suffix, args.assets_dir)
+            except Exception as exc:
+                print(f"[error] {md}: {exc}", file=sys.stderr)
+        print(f"[batch] processed {len(md_files)} markdown file(s).")
+        return 0
+
+    # Single file
+    process_markdown(target, selector, args.suffix, args.assets_dir)
     return 0
 
 

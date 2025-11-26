@@ -27,6 +27,11 @@ python ~/projects/markdown-localizer/markdown_localize.py \
   --assets-dir assets_custom
 ```
 
+Batch mode (process all `*.md` under a directory, skipping already-generated `*.local.md`):
+```bash
+python ~/projects/markdown-localizer/markdown_localize.py /path/to/dir --pattern 'https?://'
+```
+
 ## Notes
 - The script deduplicates URLs and auto-renames files when names collide (adds `_1`, `_2`, …).
 - Filenames prefer the image alt text; if missing, the URL basename is used. Non-alphanumeric characters are replaced with `_`.
