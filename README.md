@@ -37,3 +37,4 @@ python ~/projects/markdown-localizer/markdown_localize.py /path/to/dir --pattern
 - Filenames prefer the image alt text; if missing, the URL basename is used. Non-alphanumeric characters are replaced with `_`.
 - Existing files in the assets folder are preserved; new downloads use unique names.
 - Only the cloned Markdown has links rewritten; the source stays unchanged. Normalize it safely to `*.local.md` to keep diffs and recovery simple.
+- Confluence export image links often include short-lived tokens (e.g., Atlassian CDN JWTs). Run the localizer and finish downloads promptly (ideally within 24h of export) before those links expire.
