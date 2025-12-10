@@ -1,5 +1,8 @@
 # Markdown Localizer
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-green.svg)](#installation)
+
 Turn Markdown with remote images into portable, self-contained documents.
 
 Create local, self-contained copies of Markdown documents by downloading remote image links into an `assets/` folder and rewriting the Markdown to reference the local files. The source document stays untouched, which makes it ideal for Confluence exports or any Markdown using `![alt](url)` syntax.
