@@ -7,6 +7,8 @@ Turn Markdown with remote images into portable, self-contained documents.
 
 Create local, self-contained copies of Markdown documents by downloading remote image links into an `assets/` folder and rewriting the Markdown to reference the local files. The source document stays untouched, which makes it ideal for Confluence exports or any Markdown using `![alt](url)` syntax.
 
+![Demo run](assets/demo.png)
+
 ## Features
 - Converts single files or entire directory trees
 - Skips already-localized `*.local.md` files to avoid duplicates
