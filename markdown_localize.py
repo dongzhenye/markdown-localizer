@@ -3,7 +3,7 @@
 Create a local copy of a Markdown file with image links rewritten to local assets.
 
 Usage:
-  python markdown_localize.py /path/to/file.md [--suffix .local] [--assets-dir assets]
+  python markdown_localize.py [path] [--suffix .local] [--assets-dir assets]
 """
 
 import argparse
@@ -24,8 +24,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "markdown",
+        nargs="?",
         type=pathlib.Path,
-        help="Path to the source markdown file (kept untouched) or directory (batch).",
+        default=None,
+        help="Path to the source markdown file (kept untouched) or directory (batch). Defaults to the current directory when omitted.",
     )
     parser.add_argument(
         "--suffix",
@@ -123,7 +125,12 @@ def process_markdown(
     for url in urls:
         base = derive_base_name(url, alt_lookup.get(url, ""))
         filename = allocate_filename(base, asset_dir, mapping)
-        download(url, asset_dir / filename)
+        try:
+            download(url, asset_dir / filename)
+        except Exception as exc:
+            # Log and continue with other URLs instead of aborting the whole run
+            print(f"[error] {md_path}: failed to download {url}: {exc}", file=sys.stderr)
+            continue
         mapping[url] = filename
         print(f"[downloaded] {md_path}: {url} -> {asset_dir / filename}")
 
@@ -141,7 +148,8 @@ def process_markdown(
 
 def main() -> int:
     args = parse_args()
-    target: pathlib.Path = args.markdown.expanduser().resolve()
+    md_target = args.markdown or pathlib.Path.cwd()
+    target: pathlib.Path = md_target.expanduser().resolve()
     if not target.exists():
         print(f"[error] path not found: {target}", file=sys.stderr)
         return 1
