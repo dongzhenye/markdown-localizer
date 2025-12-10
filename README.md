@@ -1,40 +1,79 @@
 # Markdown Localizer
 
-Create a local, self-contained copy of Markdown file(s) by downloading inline image links and rewriting them to a local `assets/` folder. The original Markdown remains untouched. Works with Confluence exports and any other Markdown that uses standard image syntax `![alt](url)`.
+Turn Markdown with remote images into portable, self-contained documents.
 
-## Requirements
-- Python 3.9+ (stdlib only; no extra packages)
+Create local, self-contained copies of Markdown documents by downloading remote image links into an `assets/` folder and rewriting the Markdown to reference the local files. The source document stays untouched, which makes it ideal for Confluence exports or any Markdown using `![alt](url)` syntax.
 
-## Quick start
+## Features
+- Converts single files or entire directory trees
+- Skips already-localized `*.local.md` files to avoid duplicates
+- Deduplicates downloads and auto-renames conflicting filenames
+- Pure Python (stdlib only) with no external dependencies
+
+## Installation
+- Requires Python 3.9+
+- Clone or download this repository and run the script directly; no packaging or build steps are needed
+
+## Usage
+### Single Markdown file
 ```bash
 cd /path/to/your/docs
 python ~/projects/markdown-localizer/markdown_localize.py "Sample document.md"
 ```
-This will:
-- Download matched images to `assets/` (created next to the source file)
-- Write a cloned Markdown named `Sample document.local.md` (original untouched)
+The script downloads all matching images to `assets/` and writes `Sample document.local.md`, preserving the original file.
 
-## Options
-- `--suffix .local` — suffix inserted before the Markdown extension for the cloned file.
-- `--assets-dir assets` — target assets directory (relative to the Markdown file). Use `assets` to keep it clean (default). Change if you want a different folder per run.
-- `--pattern <regex>` — regex applied to each image URL to decide whether to download. Default `https?://` (download any remote image). For Confluence-only: `--pattern 'media-cdn\\.atlassian\\.com'`.
+### Current directory batch (no args)
+```bash
+cd /path/to/your/docs
+python ~/projects/markdown-localizer/markdown_localize.py
+```
+Every Markdown file under the current directory tree is processed, except files already ending in `.local.md`.
 
-Example with a custom assets folder and suffix:
+### Explicit directory or deep tree
+```bash
+python ~/projects/markdown-localizer/markdown_localize.py /path/to/tree
+```
+Point the script at any directory to recursively process it. Use the advanced options below when you need custom naming or tighter URL filters.
+
+## Command-line options
+| Option | Description | Default |
+| --- | --- | --- |
+| `--suffix <text>` | Inserted before the Markdown extension of the cloned file. | `.local` |
+| `--assets-dir <dir>` | Directory (relative to the Markdown file) used to store downloaded assets. | `assets` |
+| `--pattern <regex>` | Regex applied to image URLs to decide which ones to download. Useful for host allow-lists. | `https?://` |
+
+### Advanced example
 ```bash
 python ~/projects/markdown-localizer/markdown_localize.py \
-  "Sample document.md" \
-  --suffix .local-copy \
-  --assets-dir assets_custom
+  /path/to/tree \
+  --suffix .localized \
+  --assets-dir assets_custom \
+  --pattern 'media-cdn\\.atlassian\\.com'
 ```
+This run customizes the output naming and restricts downloads to Atlassian’s CDN.
 
-Batch mode (process all `*.md` under a directory, skipping already-generated `*.local.md`):
+## Tips & shortcuts
+Add a helper to your shell configuration so you can call the tool from anywhere without typing long paths:
 ```bash
-python ~/projects/markdown-localizer/markdown_localize.py /path/to/dir --pattern 'https?://'
-```
+# Alias when you always pass an explicit path
+alias mdloc='python ~/projects/markdown-localizer/markdown_localize.py'
 
-## Notes
-- The script deduplicates URLs and auto-renames files when names collide (adds `_1`, `_2`, …).
-- Filenames prefer the image alt text; if missing, the URL basename is used. Non-alphanumeric characters are replaced with `_`.
-- Existing files in the assets folder are preserved; new downloads use unique names.
-- Only the cloned Markdown has links rewritten; the source stays unchanged. Normalize it safely to `*.local.md` to keep diffs and recovery simple.
-- Confluence export image links often include short-lived tokens (e.g., Atlassian CDN JWTs). Run the localizer and finish downloads promptly (ideally within 24h of export) before those links expire.
+# Function keeps tab completion and defaults to the current directory
+mdloc() {
+  python ~/projects/markdown-localizer/markdown_localize.py "${1:-.}"
+}
+```
+Reload your shell (for example `source ~/.zshrc`) and call `mdloc` from anywhere. The function mirrors the script’s default behavior of treating “no argument” as “current directory”.
+
+## FAQ
+### Does the script modify the original Markdown?
+No. It always writes a new file using the configured suffix (default `.local.md`) and rewrites image links only in the cloned copy.
+
+### What happens to existing assets or duplicate URLs?
+Existing files inside the assets directory are left untouched. Each download first checks for matching URLs, prefers the Markdown alt text (falling back to a sanitized URL basename), and allocates unique names by appending `_1`, `_2`, and so on if needed.
+
+### Can I rerun it safely on the same folder?
+Yes. The tool skips files ending in `.local.md` and reuses the assets directory, so rerunning simply processes any newly added Markdown files or links that were not previously localized.
+
+### Why do some downloads fail after a while?
+Confluence and similar platforms sometimes embed short-lived tokens in image URLs. Run the localizer soon after exporting (ideally within 24 hours) to avoid expired links. Failed downloads are logged but do not stop the rest of the batch.
